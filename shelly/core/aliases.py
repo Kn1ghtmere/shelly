@@ -43,6 +43,11 @@ ALIASES: dict[str, str] = {
     "show me what's in here": "list",
     "show me whats in here": "list",
     "show what's in here": "list",
+    # copy / move / rename
+    "cp": "copy",
+    "make a copy of": "copy",
+    "mv": "move",
+    "ren": "rename",
     # folders
     **_folder_phrases(),
     "mkdir": "mkdir",

@@ -43,3 +43,20 @@ win over the built-in ones.
 
 Everything OS-specific lives in `shelly/platform/` (windows, mac, linux).
 Commands never check which system they're on.
+
+## Files and folders
+
+    go to downloads         # also: go up, go home, go back, cd ..
+    where am i
+    list                    # or: list downloads / list in downloads
+    make a folder called projects
+    make a folder called "my stuff"
+    copy notes.txt to backup
+    move notes.txt to documents
+    rename notes.txt to ideas.txt
+
+- Names can be typed in any capitals, and friendly names (`downloads`,
+  `desktop`, `documents`, ...) work from anywhere.
+- Shelly never overwrites: if the target exists, it says so and stops.
+- Your home folders, the folder you're standing in, and drive roots can't be
+  moved or renamed by accident.
