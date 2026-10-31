@@ -27,3 +27,19 @@ Single words (`youtube`, `rickroll`) and numbers (`50`) never need quotes.
 
 Blocks (`if`, `repeat`, `for`, `define`) close with `end`. `else` is allowed
 inside `if`. Lines starting with `#` are comments.
+
+## Opening things
+
+    open youtube
+    open youtube search "ben 10"
+    open youtube play rickroll
+    open firefox
+    open "C:\\Users\\me\\notes.txt"
+    apps                    # list everything Shelly knows
+
+The app list is `shelly/data/apps.toml`. To add your own, create
+`.shelly/apps.toml` in your home folder with the same format; your entries
+win over the built-in ones.
+
+Everything OS-specific lives in `shelly/platform/` (windows, mac, linux).
+Commands never check which system they're on.

@@ -1,0 +1,99 @@
+# Shelly's app list.
+# To add your own apps, make a file called apps.toml inside a folder named
+# .shelly in your home folder, using this same format. Your entries win.
+#
+# type = "web"  -> opens in your browser. {query} is replaced by what you type.
+# type = "app"  -> launches a program. Use windows / mac / linux for different
+#                  names per system, or just name = "..." if it's the same.
+
+[youtube]
+type = "web"
+aliases = ["yt"]
+home = "https://www.youtube.com"
+
+[youtube.actions]
+search = "https://www.youtube.com/results?search_query={query}"
+
+[youtube.actions.play]
+url = "https://www.youtube.com/results?search_query={query}"
+note = "Opened the results. Auto-playing the first video comes in a later phase."
+
+[google]
+type = "web"
+home = "https://www.google.com"
+
+[google.actions]
+search = "https://www.google.com/search?q={query}"
+
+[github]
+type = "web"
+aliases = ["gh"]
+home = "https://github.com"
+
+[github.actions]
+search = "https://github.com/search?q={query}"
+
+[wikipedia]
+type = "web"
+aliases = ["wiki"]
+home = "https://www.wikipedia.org"
+
+[wikipedia.actions]
+search = "https://en.wikipedia.org/w/index.php?search={query}"
+
+[maps]
+type = "web"
+home = "https://www.google.com/maps"
+
+[maps.actions]
+search = "https://www.google.com/maps/search/{query}"
+
+[spotify]
+type = "web"
+home = "https://open.spotify.com"
+
+[spotify.actions]
+search = "https://open.spotify.com/search/{query}"
+
+[reddit]
+type = "web"
+home = "https://www.reddit.com"
+
+[reddit.actions]
+search = "https://www.reddit.com/search/?q={query}"
+
+[firefox]
+type = "app"
+
+[chrome]
+type = "app"
+windows = "chrome"
+mac = "Google Chrome"
+linux = "google-chrome"
+
+[edge]
+type = "app"
+windows = "msedge"
+mac = "Microsoft Edge"
+linux = "microsoft-edge"
+
+[notepad]
+type = "app"
+aliases = ["editor"]
+windows = "notepad"
+mac = "TextEdit"
+linux = "gedit"
+
+[calculator]
+type = "app"
+aliases = ["calc"]
+windows = "calc"
+mac = "Calculator"
+linux = "gnome-calculator"
+
+[vscode]
+type = "app"
+aliases = ["code"]
+windows = "code"
+mac = "Visual Studio Code"
+linux = "code"
