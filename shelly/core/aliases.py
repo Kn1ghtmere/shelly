@@ -1,0 +1,49 @@
+"""Data tables for the parser. Add phrasings here, not in code."""
+
+# Words that mark the start of an option. Everything after one (up to the
+# next option word) is that option's value:  volume 50   in downloads
+OPTION_KEYWORDS = {"volume", "in", "at", "to", "from", "into", "as", "with", "by"}
+
+# Politeness we silently drop.
+LEADING_POLITE = {"please", "kindly", "can", "could", "would", "you"}
+TRAILING_POLITE = {"please", "kindly"}
+
+
+def _folder_phrases() -> dict[str, str]:
+    phrases = {}
+    for verb in ("make", "create"):
+        for article in ("", "a"):
+            for noun in ("folder", "directory"):
+                for tail in ("", "called", "named"):
+                    words = (verb, article, noun, tail)
+                    phrases[" ".join(w for w in words if w)] = "mkdir"
+    return phrases
+
+
+# phrase -> the one-word verb it means. Longest phrase wins.
+ALIASES: dict[str, str] = {
+    # navigation
+    "go to": "go",
+    "go into": "go",
+    "change directory": "go",
+    "cd": "go",
+    "go back": "back",
+    "where am i": "where",
+    "what folder am i in": "where",
+    "pwd": "where",
+    # listing
+    "list": "list",
+    "ls": "list",
+    "dir": "list",
+    "show files": "list",
+    "list files": "list",
+    "list everything": "list",
+    "what's in here": "list",
+    "whats in here": "list",
+    "show me what's in here": "list",
+    "show me whats in here": "list",
+    "show what's in here": "list",
+    # folders
+    **_folder_phrases(),
+    "mkdir": "mkdir",
+}
