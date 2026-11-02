@@ -5,6 +5,8 @@
 # type = "web"  -> opens in your browser. {query} is replaced by what you type.
 # type = "app"  -> launches a program. Use windows / mac / linux for different
 #                  names per system, or just name = "..." if it's the same.
+#                  Browsers can also have actions, like web apps do.
+# To change a browser's search engine, change the url of its search action.
 
 [youtube]
 type = "web"
@@ -65,17 +67,26 @@ search = "https://www.reddit.com/search/?q={query}"
 [firefox]
 type = "app"
 
+[firefox.actions]
+search = "https://www.google.com/search?q={query}"
+
 [chrome]
 type = "app"
 windows = "chrome"
 mac = "Google Chrome"
 linux = "google-chrome"
 
+[chrome.actions]
+search = "https://www.google.com/search?q={query}"
+
 [edge]
 type = "app"
 windows = "msedge"
 mac = "Microsoft Edge"
 linux = "microsoft-edge"
+
+[edge.actions]
+search = "https://www.google.com/search?q={query}"
 
 [notepad]
 type = "app"

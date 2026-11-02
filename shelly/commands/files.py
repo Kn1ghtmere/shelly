@@ -1,7 +1,7 @@
 import os
-import shutil
 from pathlib import Path
 
+from .. import platform as plat
 from ..core import paths, session
 from ..core.intent import Intent
 from ..core.registry import command
@@ -109,6 +109,19 @@ def _size(path: Path) -> str:
 # --- making and changing ------------------------------------------------
 
 
+def _base_folder(intent: Intent) -> Path | Result:
+    """Where to make things: the folder after 'in', or the current folder."""
+    if "in" not in intent.options:
+        return Path.cwd()
+    text = intent.options["in"]
+    found = paths.resolve_existing(text)
+    if found is None:
+        return not_found(text, folders_only=True)
+    if not found.is_dir():
+        return Result.fail(f"'{text}' is a file, not a folder.")
+    return found
+
+
 @command("mkdir")
 def make_folder(intent: Intent) -> Result:
     """mkdir <name>   |   mkdir <name> in <folder>"""
@@ -120,14 +133,9 @@ def make_folder(intent: Intent) -> Result:
     if len(intent.args) > 1:
         return quote_hint(intent, intent.args)
 
-    base = Path.cwd()
-    if "in" in intent.options:
-        found = paths.resolve_existing(intent.options["in"])
-        if found is None:
-            return not_found(intent.options["in"], folders_only=True)
-        if not found.is_dir():
-            return Result.fail(f"'{intent.options['in']}' is a file, not a folder.")
-        base = found
+    base = _base_folder(intent)
+    if isinstance(base, Result):
+        return base
 
     new = base / intent.args[0]
     if new.exists():
@@ -139,86 +147,58 @@ def make_folder(intent: Intent) -> Result:
     return Result.success(f"Made a folder: {new}")
 
 
-def _plan(intent: Intent, verb: str) -> tuple[Path, Path] | Result:
-    """Shared by copy and move: work out (source, target) or explain the problem."""
-    bad = reject_options(intent, {"to"})
+@command("mkfile")
+def make_file(intent: Intent) -> Result:
+    """mkfile <name>   |   mkfile <name> with "some text"   |   mkfile <name> in <folder>"""
+    bad = reject_options(intent, {"in", "with"})
     if bad:
         return bad
-    if not intent.args or "to" not in intent.options:
-        return Result.fail(f"Try: {verb} notes.txt to backup")
+    if not intent.args:
+        return Result.fail("Make a file called what? For example: make a file called notes.txt")
     if len(intent.args) > 1:
         return quote_hint(intent, intent.args)
 
-    source_text = intent.args[0]
-    source = paths.resolve_existing(source_text)
-    if source is None:
-        return not_found(source_text)
+    base = _base_folder(intent)
+    if isinstance(base, Result):
+        return base
 
-    dest_text = intent.options["to"]
-    dest = paths.resolve_existing(dest_text)
-    if dest is not None:
-        target = dest / source.name if dest.is_dir() else dest
+    new = base / intent.args[0]
+    if new.exists():
+        return Result.fail(f"{new} already exists. I won't overwrite it.")
+    if not new.parent.is_dir():
+        return Result.fail(f"I can't find the folder {new.parent}.")
+    try:
+        new.write_text(intent.options.get("with", ""), encoding="utf-8")
+    except OSError as error:
+        return Result.fail(f"I couldn't make that file: {error}")
+    return Result.success(f"Made a file: {new}")
+
+
+@command("show")
+def show(intent: Intent) -> Result:
+    """show   |   show <file or folder>   -- opens your file explorer"""
+    bad = reject_options(intent, set())
+    if bad:
+        return bad
+    if len(intent.args) > 1:
+        return quote_hint(intent, intent.args)
+
+    if intent.args:
+        found = paths.resolve_existing(intent.args[0])
+        if found is None:
+            return not_found(intent.args[0])
     else:
-        target = Path(dest_text).expanduser()
+        found = Path.cwd()
+    target = found.resolve()
 
-    if target.exists():
-        return Result.fail(f"{target} already exists. I won't overwrite it.")
-    if not target.parent.is_dir():
-        return Result.fail(f"I can't find the folder {target.parent}.")
-    if source.is_dir() and _inside(target, source):
-        return Result.fail("I can't put a folder inside itself.")
-    return source, target
-
-
-def _new_name_note(intent: Intent) -> str:
-    """If the destination wasn't an existing folder, it became the new name. Say so."""
-    dest_text = intent.options["to"]
-    if paths.resolve_existing(dest_text) is not None:
-        return ""
-    return (
-        f" ('{dest_text}' wasn't an existing folder, so it's the new name. "
-        f"To put it inside a folder, make the folder first.)"
-    )
-
-
-def _inside(target: Path, folder: Path) -> bool:
-    target, folder = target.resolve(), folder.resolve()
-    return target == folder or folder in target.parents
-
-
-@command("copy")
-def copy(intent: Intent) -> Result:
-    """copy <thing> to <place>"""
-    plan = _plan(intent, "copy")
-    if isinstance(plan, Result):
-        return plan
-    source, target = plan
-    note = _new_name_note(intent)
     try:
-        if source.is_dir():
-            shutil.copytree(source, target)
+        if target.is_dir():
+            plat.current().open_path(target)
         else:
-            shutil.copy2(source, target)
-    except (OSError, shutil.Error) as error:
-        return Result.fail(f"I couldn't copy that: {error}")
-    return Result.success(f"Copied {source.name} to {target}{note}")
-
-
-@command("move")
-def move(intent: Intent) -> Result:
-    """move <thing> to <place>"""
-    plan = _plan(intent, "move")
-    if isinstance(plan, Result):
-        return plan
-    source, target = plan
-    if paths.is_protected(source):
-        return Result.fail("That's an important folder, so I won't move it.")
-    note = _new_name_note(intent)
-    try:
-        shutil.move(str(source), str(target))
-    except (OSError, shutil.Error) as error:
-        return Result.fail(f"I couldn't move that: {error}")
-    return Result.success(f"Moved {source.name} to {target}{note}")
+            plat.current().reveal(target)
+    except plat.PlatformError as error:
+        return Result.fail(str(error))
+    return Result.success(f"Showing {target} in your file explorer.")
 
 
 @command("rename")

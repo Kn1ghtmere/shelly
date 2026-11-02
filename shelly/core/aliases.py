@@ -9,14 +9,15 @@ LEADING_POLITE = {"please", "kindly", "can", "could", "would", "you"}
 TRAILING_POLITE = {"please", "kindly"}
 
 
-def _folder_phrases() -> dict[str, str]:
+def _make_phrases(nouns: tuple[str, ...], canonical: str) -> dict[str, str]:
+    """make/create [a] <noun> [called|named]  ->  canonical verb"""
     phrases = {}
     for verb in ("make", "create"):
         for article in ("", "a"):
-            for noun in ("folder", "directory"):
+            for noun in nouns:
                 for tail in ("", "called", "named"):
                     words = (verb, article, noun, tail)
-                    phrases[" ".join(w for w in words if w)] = "mkdir"
+                    phrases[" ".join(w for w in words if w)] = canonical
     return phrases
 
 
@@ -24,6 +25,7 @@ def _folder_phrases() -> dict[str, str]:
 ALIASES: dict[str, str] = {
     # navigation
     "go to": "go",
+    "goto": "go",
     "go into": "go",
     "change directory": "go",
     "cd": "go",
@@ -48,7 +50,10 @@ ALIASES: dict[str, str] = {
     "make a copy of": "copy",
     "mv": "move",
     "ren": "rename",
-    # folders
-    **_folder_phrases(),
+    # folders and files
+    **_make_phrases(("folder", "directory"), "mkdir"),
     "mkdir": "mkdir",
+    **_make_phrases(("file",), "mkfile"),
+    "mkfile": "mkfile",
+    "touch": "mkfile",
 }

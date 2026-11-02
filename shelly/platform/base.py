@@ -19,8 +19,16 @@ class Platform:
         if not webbrowser.open(url):
             raise PlatformError("I couldn't open a web browser.")
 
+    def open_url_in(self, app: str, url: str) -> None:
+        """Open a web address in one specific browser."""
+        raise NotImplementedError
+
     def open_app(self, name: str) -> None:
         raise NotImplementedError
 
     def open_path(self, path: Path) -> None:
         raise NotImplementedError
+
+    def reveal(self, path: Path) -> None:
+        """Show a file in the file explorer (highlighted where the OS can)."""
+        self.open_path(path.parent)

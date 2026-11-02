@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from shelly.core.engine import run_line
+from shelly.core.engine import answer, run_line
 
 
 def here() -> Path:
@@ -184,44 +184,15 @@ def test_copy_file_to_a_new_name(work):
     assert (work / "b.txt").read_text() == "hello"
 
 
-def test_copy_folder(work):
-    (work / "src").mkdir()
-    (work / "src" / "x.txt").write_text("x")
-    assert run_line("copy src to dst").ok
-    assert (work / "dst" / "x.txt").exists()
-
-
-def test_copy_never_overwrites(work):
-    (work / "a.txt").write_text("new")
-    (work / "backup").mkdir()
-    (work / "backup" / "a.txt").write_text("old")
-    result = run_line("copy a.txt to backup")
-    assert not result.ok
-    assert "overwrite" in result.message
-    assert (work / "backup" / "a.txt").read_text() == "old"
-
-
 def test_copy_folder_into_itself_is_refused(work):
     (work / "src").mkdir()
     assert not run_line("copy src to src/inner").ok
-
-
-def test_copy_to_a_missing_folder(work):
-    (work / "a.txt").write_text("x")
-    result = run_line("copy a.txt to nope/b.txt")
-    assert not result.ok
-    assert "can't find the folder" in result.message
 
 
 def test_copy_typo_suggests(work):
     (work / "a.txt").write_text("x")
     result = run_line("copy a.txtt to backup")
     assert "a.txt" in result.message
-
-
-def test_copy_without_to_explains(work):
-    (work / "a.txt").write_text("x")
-    assert "Try: copy" in run_line("copy a.txt").message
 
 
 def test_copy_with_spaces_suggests_quotes(work):
@@ -244,14 +215,6 @@ def test_move_to_a_new_name(work):
     (work / "a.txt").write_text("hello")
     assert run_line("mv a.txt to b.txt").ok
     assert (work / "b.txt").exists()
-
-
-def test_move_never_overwrites(work):
-    (work / "a.txt").write_text("new")
-    (work / "backup").mkdir()
-    (work / "backup" / "a.txt").write_text("old")
-    assert not run_line("move a.txt to backup").ok
-    assert (work / "a.txt").exists()
 
 
 def test_move_folder(work):
@@ -315,20 +278,67 @@ def test_rename_without_to_explains(work):
 # --- the "destination doesn't exist" trap -------------------------------
 
 
-def test_move_to_a_missing_folder_says_it_became_a_new_name(work):
-    (work / "a.txt").write_text("x")
-    result = run_line("move a.txt to documents")
-    assert result.ok
-    assert (work / "documents").is_file()
-    assert "new name" in result.message
-
-
-def test_copy_to_a_missing_folder_says_it_became_a_new_name(work):
-    (work / "a.txt").write_text("x")
-    assert "new name" in run_line("copy a.txt to documents").message
-
-
 def test_move_into_a_real_folder_has_no_warning(work):
     (work / "a.txt").write_text("x")
     (work / "documents").mkdir()
     assert "new name" not in run_line("move a.txt to documents").message
+
+
+# --- behaviour that changed when questions arrived -------------------------
+
+
+def test_copy_folder_to_a_missing_folder_asks_then_puts_it_inside(work):
+    (work / "src").mkdir()
+    (work / "src" / "x.txt").write_text("x")
+    result = run_line("copy src to dst")
+    assert result.ask is not None
+    assert not (work / "dst").exists()
+    answer(result.ask, "yes")
+    assert (work / "dst" / "src" / "x.txt").exists()
+
+
+def test_copy_over_an_existing_file_asks_and_changes_nothing_yet(work):
+    (work / "a.txt").write_text("new")
+    (work / "backup").mkdir()
+    (work / "backup" / "a.txt").write_text("old")
+    result = run_line("copy a.txt to backup")
+    assert result.ask is not None
+    assert (work / "backup" / "a.txt").read_text() == "old"
+    answer(result.ask, "cancel")
+    assert (work / "backup" / "a.txt").read_text() == "old"
+
+
+def test_copy_into_a_missing_path_asks_to_create_the_folder(work):
+    (work / "a.txt").write_text("x")
+    result = run_line("copy a.txt to nope/b.txt")
+    assert "There is no folder named 'nope'" in result.ask.prompt
+
+
+def test_copy_with_no_destination_goes_on_the_clipboard(work):
+    (work / "a.txt").write_text("x")
+    result = run_line("copy a.txt")
+    assert result.ok
+    assert "paste" in result.message
+
+
+def test_copy_with_nothing_named_explains(work):
+    assert "Copy what?" in run_line("copy").message
+
+
+def test_move_over_an_existing_file_asks(work):
+    (work / "a.txt").write_text("new")
+    (work / "backup").mkdir()
+    (work / "backup" / "a.txt").write_text("old")
+    result = run_line("move a.txt to backup")
+    assert result.ask is not None
+    assert (work / "a.txt").exists()
+
+
+def test_move_to_a_missing_folder_asks_instead_of_renaming(work):
+    (work / "a.txt").write_text("x")
+    result = run_line("move a.txt to documents")
+    assert "no folder named 'documents'" in result.ask.prompt
+    assert (work / "a.txt").exists()
+    answer(result.ask, "yes")
+    assert (work / "documents" / "a.txt").exists()
+    assert not (work / "a.txt").exists()

@@ -1,6 +1,8 @@
 """Finding files and folders the way a person would name them."""
 
 import difflib
+import os
+import re
 from pathlib import Path
 
 # Friendly names that point at the usual folders in your home folder.
@@ -18,6 +20,12 @@ def home() -> Path:
     return Path.home()
 
 
+def _drive_root(word: str) -> str:
+    """On Windows a bare 'D:' means 'the last folder you used on D:'.
+    People mean the drive itself, so turn it into 'D:\\'."""
+    return word + os.sep if re.fullmatch(r"[A-Za-z]:", word) else word
+
+
 def _known_candidates(name: str) -> list[Path]:
     # OneDrive often moves Desktop/Documents/Pictures, so check there too.
     return [home() / name, home() / "OneDrive" / name]
@@ -29,7 +37,7 @@ def resolve_existing(text: str) -> Path | None:
     Tries, in order: the path as typed, the same ignoring capital letters,
     then the friendly names (up, home, downloads, ...).
     """
-    word = text.strip()
+    word = _drive_root(text.strip())
     if not word:
         return None
 

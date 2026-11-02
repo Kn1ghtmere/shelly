@@ -4,15 +4,23 @@ from ..core.parser import parse_line
 from ..core.registry import command
 from ..core.result import Result
 
+FAREWELLS = {
+    "bye": "Bye!",
+    "goodbye": "Goodbye! See you soon.",
+    "exit": "Closing Shelly.",
+    "quit": "Closing Shelly.",
+    "end": "All done. See you!",
+}
+
 
 @command("hello", "hi")
 def hello(intent: Intent) -> Result:
     return Result.success("Hello! I'm Shelly.")
 
 
-@command("exit", "quit", "bye")
-def bye(intent: Intent) -> Result:
-    return Result(True, "Bye!", should_exit=True)
+@command(*FAREWELLS)
+def leave(intent: Intent) -> Result:
+    return Result(True, FAREWELLS.get(intent.verb, "Bye!"), should_exit=True)
 
 
 @command("say")

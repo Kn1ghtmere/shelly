@@ -1,6 +1,8 @@
 """The list of apps Shelly knows, loaded from apps.toml files."""
 
 import difflib
+import json
+import re
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -122,3 +124,66 @@ def set_book(book: AppBook | None) -> None:
     """Swap the app list (used by tests). None means 'reload from disk'."""
     global _book
     _book = book
+
+
+# --- editing the user's own apps.toml -----------------------------------
+
+
+def _toml_string(value: str) -> str:
+    # Single quotes mean "no escaping", which keeps Windows paths readable.
+    if "'" not in value and "\n" not in value:
+        return f"'{value}'"
+    return json.dumps(value, ensure_ascii=False)
+
+
+def _toml_key(name: str) -> str:
+    return name if re.fullmatch(r"[A-Za-z0-9_-]+", name) else json.dumps(name)
+
+
+def append_user_section(name: str, fields: dict[str, str], file: Path | None = None) -> None:
+    """Add a [name] section to the user's apps.toml (creating the file if needed)."""
+    file = file or USER_FILE
+    file.parent.mkdir(parents=True, exist_ok=True)
+    existing = file.read_text(encoding="utf-8") if file.exists() else ""
+    block = f"[{_toml_key(name)}]\n" + "".join(
+        f"{key} = {_toml_string(value)}\n" for key, value in fields.items()
+    )
+    if existing and not existing.endswith("\n"):
+        existing += "\n"
+    if existing and not existing.endswith("\n\n"):
+        existing += "\n"
+    file.write_text(existing + block, encoding="utf-8")
+    set_book(None)
+
+
+_HEADER = re.compile(r"^\s*\[\s*([^\[\]]+?)\s*\]\s*(#.*)?$")
+
+
+def _table_name(line: str) -> str | None:
+    match = _HEADER.match(line)
+    return match.group(1).strip("\"'").lower() if match else None
+
+
+def remove_user_section(name: str, file: Path | None = None) -> bool:
+    """Remove [name] (and its sub-tables) from the user's apps.toml. False if absent."""
+    file = file or USER_FILE
+    if not file.exists():
+        return False
+    wanted = name.lower()
+    lines = file.read_text(encoding="utf-8").splitlines(keepends=True)
+
+    start = next((i for i, line in enumerate(lines) if _table_name(line) == wanted), None)
+    if start is None:
+        return False
+    end = len(lines)
+    for j in range(start + 1, len(lines)):
+        other = _table_name(lines[j])
+        if other is not None and not other.startswith(wanted + "."):
+            end = j
+            break
+
+    del lines[start:end]
+    text = "".join(lines).rstrip()
+    file.write_text(text + "\n" if text else "", encoding="utf-8")
+    set_book(None)
+    return True

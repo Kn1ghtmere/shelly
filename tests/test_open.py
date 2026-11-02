@@ -1,43 +1,4 @@
-import pytest
-
-from shelly import commands  # noqa: F401
-from shelly import platform as plat
-from shelly.core import appbook
 from shelly.core.engine import run_line
-
-
-class FakePlatform(plat.Platform):
-    key = "windows"
-
-    def __init__(self):
-        self.urls, self.apps, self.paths = [], [], []
-        self.error = None
-
-    def _maybe_fail(self):
-        if self.error:
-            raise plat.PlatformError(self.error)
-
-    def open_url(self, url):
-        self._maybe_fail()
-        self.urls.append(url)
-
-    def open_app(self, name):
-        self._maybe_fail()
-        self.apps.append(name)
-
-    def open_path(self, path):
-        self._maybe_fail()
-        self.paths.append(path)
-
-
-@pytest.fixture
-def fake():
-    system = FakePlatform()
-    plat.set_current(system)
-    appbook.set_book(appbook.AppBook.load([appbook.DEFAULT_FILE]))
-    yield system
-    plat.set_current(None)
-    appbook.set_book(None)
 
 
 def test_open_web_app_opens_home(fake):
@@ -90,16 +51,49 @@ def test_desktop_app_uses_platform_name(fake):
     assert fake.apps == ["chrome", "Google Chrome"]
 
 
-def test_desktop_app_rejects_extra_words(fake):
+def test_desktop_app_without_actions_rejects_extra_words(fake):
+    result = run_line("open calculator play lofi")
+    assert not result.ok
+    assert "extra words" in result.message
+    assert fake.apps == []
+
+
+def test_browser_search(fake):
+    result = run_line('open chrome search "ben 10"')
+    assert result.ok
+    assert fake.urls_in == [("chrome", "https://www.google.com/search?q=ben+10")]
+    assert fake.apps == []
+
+
+def test_browser_search_uses_the_right_name_per_os(fake):
+    fake.key = "mac"
+    run_line("open chrome search lofi")
+    assert fake.urls_in[0][0] == "Google Chrome"
+
+
+def test_every_browser_can_search(fake):
+    for browser in ("firefox", "edge", "chrome"):
+        assert run_line(f"open {browser} search lofi").ok
+    assert len(fake.urls_in) == 3
+
+
+def test_browser_unknown_action(fake):
     result = run_line("open firefox play lofi")
     assert not result.ok
-    assert fake.apps == []
+    assert "search" in result.message
+
+
+def test_plain_browser_still_just_launches(fake):
+    run_line("open firefox")
+    assert fake.apps == ["firefox"]
+    assert fake.urls_in == []
 
 
 def test_unknown_app_suggests_a_close_one(fake):
     result = run_line("open yotube")
     assert not result.ok
     assert "youtube" in result.message
+    assert "add app" in result.message
 
 
 def test_existing_file_opens_with_default_program(fake, tmp_path):
@@ -137,4 +131,4 @@ def test_apps_command_lists_known_apps(fake):
     result = run_line("apps")
     assert result.ok
     assert "youtube (yt)" in result.message
-    assert "firefox" in result.message
+    assert "firefox  - search" in result.message
