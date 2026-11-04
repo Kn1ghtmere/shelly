@@ -6,6 +6,8 @@
 # type = "app"  -> launches a program. Use windows / mac / linux for different
 #                  names per system, or just name = "..." if it's the same.
 #                  Browsers can also have actions, like web apps do.
+# role = "browser" lets sites open in it: open youtube in chrome
+# process = the program name `close` should look for, if it differs.
 # To change a browser's search engine, change the url of its search action.
 
 [youtube]
@@ -66,12 +68,16 @@ search = "https://www.reddit.com/search/?q={query}"
 
 [firefox]
 type = "app"
+role = "browser"
+process = "firefox.exe"
 
 [firefox.actions]
 search = "https://www.google.com/search?q={query}"
 
 [chrome]
 type = "app"
+role = "browser"
+process = "chrome.exe"
 windows = "chrome"
 mac = "Google Chrome"
 linux = "google-chrome"
@@ -81,6 +87,8 @@ search = "https://www.google.com/search?q={query}"
 
 [edge]
 type = "app"
+role = "browser"
+process = "msedge.exe"
 windows = "msedge"
 mac = "Microsoft Edge"
 linux = "microsoft-edge"
@@ -90,6 +98,7 @@ search = "https://www.google.com/search?q={query}"
 
 [notepad]
 type = "app"
+process = "notepad.exe"
 aliases = ["editor"]
 windows = "notepad"
 mac = "TextEdit"
@@ -97,6 +106,7 @@ linux = "gedit"
 
 [calculator]
 type = "app"
+process = "CalculatorApp.exe"
 aliases = ["calc"]
 windows = "calc"
 mac = "Calculator"
@@ -104,6 +114,7 @@ linux = "gnome-calculator"
 
 [vscode]
 type = "app"
+process = "Code.exe"
 aliases = ["code"]
 windows = "code"
 mac = "Visual Studio Code"

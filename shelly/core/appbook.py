@@ -34,6 +34,8 @@ class App:
     home: str = ""
     actions: dict[str, Action] = field(default_factory=dict)
     launch: dict[str, str] = field(default_factory=dict)
+    role: str = ""  # "browser" for browsers: sites can be opened in them
+    process: str = ""  # program name to close, when it differs from the launch name
 
     def launch_name(self, platform_key: str) -> str:
         return self.launch.get(platform_key) or self.launch.get("name") or self.name
@@ -107,6 +109,8 @@ def _parse_app(name: str, spec: object) -> App:
         home=spec.get("home", ""),
         actions=actions,
         launch=launch,
+        role=str(spec.get("role", "")).lower(),
+        process=str(spec.get("process", "")),
     )
 
 
@@ -140,14 +144,22 @@ def _toml_key(name: str) -> str:
     return name if re.fullmatch(r"[A-Za-z0-9_-]+", name) else json.dumps(name)
 
 
-def append_user_section(name: str, fields: dict[str, str], file: Path | None = None) -> None:
-    """Add a [name] section to the user's apps.toml (creating the file if needed)."""
+def append_user_section(
+    name: str,
+    fields: dict[str, str],
+    actions: dict[str, str] | None = None,
+    file: Path | None = None,
+) -> None:
+    """Add a [name] section (and an optional [name.actions] one) to the user's apps.toml."""
     file = file or USER_FILE
     file.parent.mkdir(parents=True, exist_ok=True)
     existing = file.read_text(encoding="utf-8") if file.exists() else ""
-    block = f"[{_toml_key(name)}]\n" + "".join(
-        f"{key} = {_toml_string(value)}\n" for key, value in fields.items()
-    )
+    key = _toml_key(name)
+    block = f"[{key}]\n" + "".join(f"{k} = {_toml_string(v)}\n" for k, v in fields.items())
+    if actions:
+        block += f"\n[{key}.actions]\n" + "".join(
+            f"{k} = {_toml_string(v)}\n" for k, v in actions.items()
+        )
     if existing and not existing.endswith("\n"):
         existing += "\n"
     if existing and not existing.endswith("\n\n"):

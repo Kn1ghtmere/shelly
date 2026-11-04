@@ -6,12 +6,9 @@ import shutil
 from collections.abc import Callable
 from pathlib import Path
 
+from .. import platform as plat
 from . import paths
-from .result import NO_WORDS, Ask, Choice, Result
-
-REPLACE_WORDS = frozenset({"replace", "r", "overwrite", "replace it", "overwrite it"})
-KEEP_WORDS = frozenset({"keep both", "both", "keep", "b", "duplicate", "keep them", "number"})
-CANCEL_WORDS = NO_WORDS | frozenset({"c"})
+from .result import CANCEL_WORDS, KEEP_WORDS, REPLACE_WORDS, Ask, Choice, Result
 
 
 class TransferError(Exception):
@@ -60,12 +57,24 @@ def send(
     dest_text: str | None,
     mode: str,
     on_done: OnDone | None = None,
+    dest_chain: list[str] | None = None,
 ) -> Result:
     """Copy or move `sources`. mode is 'copy' or 'move'.
-    dest_text None means the current folder."""
+
+    dest_text None means "the current folder" (or the end of dest_chain, if
+    given). dest_chain is a written-out 'in' chain, inner-to-outer, that says
+    which folder dest_text lives in."""
     sources = [absolute(s) for s in sources]
+
+    base: Path | None = None
+    if dest_chain:
+        found = paths.locate(None, dest_chain, folders_only=True)
+        if isinstance(found, str):
+            return Result.fail(found)
+        base = absolute(found)
+
     try:
-        folder, pairs = _targets(sources, dest_text)
+        folder, pairs = _targets(sources, dest_text, base)
         for source, target in pairs:
             _check(source, target, mode)
     except TransferError as error:
@@ -81,12 +90,14 @@ def send(
 # --- working out where things go ------------------------------------------
 
 
-def _targets(sources: list[Path], dest_text: str | None) -> tuple[Path, list[tuple[Path, Path]]]:
+def _targets(
+    sources: list[Path], dest_text: str | None, base: Path | None
+) -> tuple[Path, list[tuple[Path, Path]]]:
     if dest_text is None:
-        folder = Path.cwd()
+        folder = base if base is not None else Path.cwd()
         return folder, [(s, folder / s.name) for s in sources]
 
-    dest = paths.resolve_existing(dest_text)
+    dest = paths.resolve_existing(dest_text) if base is None else paths.child_of(base, dest_text)
     if dest is not None:
         dest = absolute(dest)
         if dest.is_dir():
@@ -95,7 +106,7 @@ def _targets(sources: list[Path], dest_text: str | None) -> tuple[Path, list[tup
             raise TransferError("I can't put several things into one file.")
         return dest.parent, [(sources[0], dest)]
 
-    path = absolute(Path(dest_text))
+    path = absolute(Path(dest_text) if base is None else base / dest_text)
     if len(sources) == 1 and looks_like_file_name(dest_text, sources[0]):
         return path.parent, [(sources[0], path)]
     return path, [(s, path / s.name) for s in sources]
@@ -154,7 +165,7 @@ def _conflict(pairs, index, lines, mode, on_done, allow_replace: bool) -> Result
 
     def cancel() -> Result:
         done = "\n".join(lines) + "\n" if lines else ""
-        return Result.success(done + "Okay, cancelled. Nothing else was changed.")
+        return Result(False, done + "Okay, cancelled. Nothing else was changed.")
 
     choices = []
     if allow_replace:
@@ -191,7 +202,7 @@ def _apply(pairs, index, lines, mode, on_done, target: Path, replace: bool) -> R
         return Result.fail(f"{done}I couldn't {mode} {source.name}: {error}")
 
     verb = "Copied" if mode == "copy" else "Moved"
-    note = " (replaced the old one)" if replace else ""
+    note = " (replaced the old one; it's in the trash)" if replace else ""
     lines.append(f"{verb} {source.name} to {target}{note}")
     if mode == "move" and on_done:
         on_done(source)
@@ -199,16 +210,32 @@ def _apply(pairs, index, lines, mode, on_done, target: Path, replace: bool) -> R
 
 
 def _do(source: Path, target: Path, mode: str, replace: bool) -> None:
-    if replace and target.exists():
-        # Put the new one next to the old one first, so a failure can't lose both.
-        staging = target.with_name(target.name + ".shelly-new")
-        if staging.exists():
-            raise OSError(f"{staging.name} is in the way")
-        _transfer(source, staging, mode)
-        _remove(target)
-        staging.rename(target)
-    else:
+    if not (replace and target.exists()):
         _transfer(source, target, mode)
+        return
+
+    # Put the new one next to the old one first, so a failure can't lose both.
+    staging = target.with_name(target.name + ".shelly-new")
+    if staging.exists():
+        raise OSError(f"{staging.name} is in the way")
+    _transfer(source, staging, mode)
+    try:
+        _discard(target)
+        staging.rename(target)
+    except OSError:
+        if mode == "copy":
+            _remove(staging)
+        else:
+            shutil.move(str(staging), str(source))  # put it back where it came from
+        raise
+
+
+def _discard(path: Path) -> None:
+    """Send the old file to the trash (never delete it outright)."""
+    try:
+        plat.current().trash(path)
+    except plat.PlatformError as error:
+        raise OSError(f"I couldn't move the old one to the trash ({error})") from error
 
 
 def _transfer(source: Path, target: Path, mode: str) -> None:

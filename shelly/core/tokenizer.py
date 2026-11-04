@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .errors import ParseError
 
@@ -7,6 +7,9 @@ from .errors import ParseError
 class Token:
     text: str
     quoted: bool = False
+    # Where the token sits in the original line (used to keep a command's own text).
+    start: int = field(default=0, compare=False)
+    end: int = field(default=0, compare=False)
 
 
 def tokenize(line: str) -> list[Token]:
@@ -26,12 +29,12 @@ def tokenize(line: str) -> list[Token]:
             end = line.find(ch, i + 1)
             if end == -1:
                 raise ParseError(f"There's an opening {ch} quote with no closing one.")
-            tokens.append(Token(line[i + 1:end], quoted=True))
+            tokens.append(Token(line[i + 1:end], True, i, end + 1))
             i = end + 1
         else:
             j = i
             while j < n and not line[j].isspace():
                 j += 1
-            tokens.append(Token(line[i:j]))
+            tokens.append(Token(line[i:j], False, i, j))
             i = j
     return tokens

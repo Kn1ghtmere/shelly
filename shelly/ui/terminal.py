@@ -1,31 +1,36 @@
 from .. import commands  # noqa: F401  (registers commands)
-from ..core.engine import answer, run_line
+from ..core.engine import answer, run_chain
 from ..core.result import Ask, Result
+from . import completion
 
 
 def main() -> None:
-    print("Shelly here. Try 'hello' or 'bye'.")
+    completion.setup()
+    print("Shelly here. Try 'hello', 'help' or 'bye'.")
     while True:
         try:
             line = input("shelly> ")
         except (EOFError, KeyboardInterrupt):
             print()
             break
-
-        result = run_line(line)
-        if result is None:
+        if not line.strip():
             continue
-        if show(result):
+        if any(result.should_exit for result in run_chain(line, settle)):
             break
 
 
-def show(result: Result) -> bool:
-    """Print a result, asking any questions it raises. True means 'exit Shelly'."""
+def settle(result: Result) -> Result:
+    """Show a result, asking any questions it raises. Returns the final result."""
     while result.ask is not None:
         result = ask_person(result.ask)
     if result.message:
         print(result.message)
-    return result.should_exit
+    return result
+
+
+def show(result: Result) -> bool:
+    """Like settle, but returns True when Shelly should exit."""
+    return settle(result).should_exit
 
 
 def ask_person(ask: Ask) -> Result:

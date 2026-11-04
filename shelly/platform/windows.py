@@ -1,9 +1,18 @@
+import ntpath
 import os
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 from .base import Platform, PlatformError
+
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+# Windows virtual-key codes for the media and volume keys.
+_VK_MEDIA = {"play": 0xB3, "pause": 0xB3, "stop": 0xB2, "next": 0xB0, "previous": 0xB1}
+_VK_VOLUME_DOWN = 0xAE
+_VK_VOLUME_UP = 0xAF
 
 
 class WindowsPlatform(Platform):
@@ -26,6 +35,14 @@ class WindowsPlatform(Platform):
             raise PlatformError(f"I couldn't find '{app}'. Is it installed?")
         subprocess.Popen([exe, url])
 
+    def close_app(self, name: str, process: str | None = None) -> None:
+        image = process or _image_name(name)
+        done = subprocess.run(
+            ["taskkill", "/IM", image], capture_output=True, text=True, creationflags=_NO_WINDOW
+        )
+        if done.returncode != 0:
+            raise PlatformError(f"I don't see {image} running.")
+
     def open_path(self, path: Path) -> None:
         try:
             os.startfile(str(path))  # type: ignore[attr-defined]
@@ -35,6 +52,48 @@ class WindowsPlatform(Platform):
     def reveal(self, path: Path) -> None:
         # explorer reports exit code 1 even when it works, so don't check it.
         subprocess.Popen(f'explorer /select,"{path}"')
+
+    def trash(self, path: Path) -> None:
+        method = "DeleteDirectory" if path.is_dir() else "DeleteFile"
+        script = (
+            "Add-Type -AssemblyName Microsoft.VisualBasic; "
+            f"[Microsoft.VisualBasic.FileIO.FileSystem]::{method}"
+            "($env:SHELLY_TRASH, 'OnlyErrorDialogs', 'SendToRecycleBin')"
+        )
+        done = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+            env={**os.environ, "SHELLY_TRASH": str(path)},
+            capture_output=True, text=True, creationflags=_NO_WINDOW,
+        )
+        if done.returncode != 0:
+            raise PlatformError(f"I couldn't move {path.name} to the Recycle Bin.")
+
+    # --- music ---------------------------------------------------------
+
+    def _press(self, key_code: int, times: int = 1) -> None:
+        import ctypes
+
+        user32 = ctypes.windll.user32  # type: ignore[attr-defined]
+        for _ in range(times):
+            user32.keybd_event(key_code, 0, 0, 0)  # key down
+            user32.keybd_event(key_code, 0, 2, 0)  # key up
+            time.sleep(0.003)
+
+    def media(self, action: str) -> None:
+        # Play and pause are one key on Windows: it flips between them.
+        self._press(_VK_MEDIA[action])
+
+    def set_volume(self, percent: int, music_only: bool) -> str:
+        # Windows has no built-in way to set volume directly, but each volume
+        # key press moves it 2%. So: all the way down, then up to the target.
+        self._press(_VK_VOLUME_DOWN, 50)
+        self._press(_VK_VOLUME_UP, round(percent / 2))
+        return "system volume"
+
+
+def _image_name(name: str) -> str:
+    base = ntpath.basename(name)
+    return base if base.lower().endswith(".exe") else base + ".exe"
 
 
 def _find_exe(name: str) -> str | None:

@@ -45,7 +45,25 @@ def clipboard_done(item: Path) -> None:
         _clipboard = None
 
 
+# --- long listings: 'more' shows the next page -----------------------------
+
+_pager: list[str] = []
+
+
+def set_pager(lines: list[str]) -> None:
+    global _pager
+    _pager = list(lines)
+
+
+def take_page(size: int) -> tuple[list[str], int]:
+    """The next `size` lines, and how many are still left after them."""
+    page = _pager[:size]
+    del _pager[:size]
+    return page, len(_pager)
+
+
 def clear() -> None:
     global _clipboard
     _history.clear()
     _clipboard = None
+    _pager.clear()

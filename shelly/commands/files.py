@@ -6,9 +6,10 @@ from ..core import paths, session
 from ..core.intent import Intent
 from ..core.registry import command
 from ..core.result import Result
-from ._common import not_found, quote_hint, reject_options
+from ._common import locate_or_fail, not_found, quote_hint, reject_options
 
-MAX_LISTED = 200
+PAGE = 50
+PAGE_ALL = 1000
 
 
 # --- moving around ------------------------------------------------------
@@ -16,19 +17,22 @@ MAX_LISTED = 200
 
 @command("go")
 def go(intent: Intent) -> Result:
-    """go <folder>   (also: up, home, downloads, ..)"""
-    bad = reject_options(intent, set())
+    """go <folder>   |   go <folder> in <folder> in D:   (also: up, home, downloads, ..)"""
+    bad = reject_options(intent, {"in"})
     if bad:
         return bad
     if len(intent.args) > 1:
         return quote_hint(intent, intent.args)
 
-    target = intent.args[0] if intent.args else "home"
-    place = paths.resolve_existing(target)
-    if place is None:
-        return not_found(target, folders_only=True)
+    chain = intent.containers.get("", [])
+    name = intent.args[0] if intent.args else None
+    if name is None and not chain:
+        name = "home"
+    place = locate_or_fail(name, chain, folders_only=True)
+    if isinstance(place, Result):
+        return place
     if not place.is_dir():
-        return Result.fail(f"'{target}' is a file, not a folder.")
+        return Result.fail(f"'{name}' is a file, not a folder.")
 
     before = Path.cwd()
     try:
@@ -60,43 +64,67 @@ def where(intent: Intent) -> Result:
 # --- looking ------------------------------------------------------------
 
 
-@command("list")
-def list_folder(intent: Intent) -> Result:
-    """list   |   list <folder>   |   list in <folder>"""
+def _list(intent: Intent, page_size: int) -> Result:
     bad = reject_options(intent, {"in"})
     if bad:
         return bad
     if len(intent.args) > 1:
         return quote_hint(intent, intent.args)
-    if intent.args and "in" in intent.options:
-        return Result.fail("Use either 'list downloads' or 'list in downloads', not both.")
 
-    text = intent.args[0] if intent.args else intent.options.get("in")
-    if text is None:
-        place = Path.cwd()
-    else:
-        place = paths.resolve_existing(text)
-        if place is None:
-            return not_found(text, folders_only=True)
-        if not place.is_dir():
-            return Result.fail(f"'{text}' is a file, not a folder.")
+    name = intent.args[0] if intent.args else None
+    place = locate_or_fail(name, intent.containers.get("", []), folders_only=True)
+    if isinstance(place, Result):
+        return place
+    if not place.is_dir():
+        return Result.fail(f"'{name}' is a file, not a folder.")
 
     try:
         entries = sorted(place.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))
     except OSError as error:
         return Result.fail(f"I couldn't look in there: {error}")
 
-    lines = [str(place.resolve())]
-    for entry in entries[:MAX_LISTED]:
+    lines = []
+    for entry in entries:
         if entry.is_dir():
             lines.append(f"  {entry.name}/")
         else:
             lines.append(f"  {entry.name}  ({_size(entry)})")
     if not entries:
         lines.append("  (empty)")
-    if len(entries) > MAX_LISTED:
-        lines.append(f"  ...and {len(entries) - MAX_LISTED} more")
-    return Result.success("\n".join(lines), data=[e.name for e in entries])
+
+    session.set_pager(lines)
+    return Result.success(
+        "\n".join([str(place.resolve()), *_next_page(page_size)]),
+        data=[e.name for e in entries],
+    )
+
+
+def _next_page(size: int) -> list[str]:
+    page, left = session.take_page(size)
+    if left:
+        page.append(f"  ...and {left} more. Say 'more' to see the next {PAGE}.")
+    return page
+
+
+@command("list")
+def list_folder(intent: Intent) -> Result:
+    """list   |   list <folder>   |   list in <folder>"""
+    return _list(intent, PAGE)
+
+
+@command("listall")
+def list_everything(intent: Intent) -> Result:
+    """list all   -- shows everything, not just the first page"""
+    return _list(intent, PAGE_ALL)
+
+
+@command("more")
+def more(intent: Intent) -> Result:
+    """The next page of the last listing."""
+    page = _next_page(PAGE)
+    if not page:
+        return Result.fail("There's nothing more to show.")
+    return Result.success("\n".join(page))
 
 
 def _size(path: Path) -> str:
@@ -110,21 +138,13 @@ def _size(path: Path) -> str:
 
 
 def _base_folder(intent: Intent) -> Path | Result:
-    """Where to make things: the folder after 'in', or the current folder."""
-    if "in" not in intent.options:
-        return Path.cwd()
-    text = intent.options["in"]
-    found = paths.resolve_existing(text)
-    if found is None:
-        return not_found(text, folders_only=True)
-    if not found.is_dir():
-        return Result.fail(f"'{text}' is a file, not a folder.")
-    return found
+    """Where to make things: the end of the 'in' chain, or the current folder."""
+    return locate_or_fail(None, intent.containers.get("", []), folders_only=True)
 
 
 @command("mkdir")
 def make_folder(intent: Intent) -> Result:
-    """mkdir <name>   |   mkdir <name> in <folder>"""
+    """mkdir <name>   |   mkdir <name> in <folder> in D:"""
     bad = reject_options(intent, {"in"})
     if bad:
         return bad
@@ -177,18 +197,16 @@ def make_file(intent: Intent) -> Result:
 @command("show")
 def show(intent: Intent) -> Result:
     """show   |   show <file or folder>   -- opens your file explorer"""
-    bad = reject_options(intent, set())
+    bad = reject_options(intent, {"in"})
     if bad:
         return bad
     if len(intent.args) > 1:
         return quote_hint(intent, intent.args)
 
-    if intent.args:
-        found = paths.resolve_existing(intent.args[0])
-        if found is None:
-            return not_found(intent.args[0])
-    else:
-        found = Path.cwd()
+    name = intent.args[0] if intent.args else None
+    found = locate_or_fail(name, intent.containers.get("", []))
+    if isinstance(found, Result):
+        return found
     target = found.resolve()
 
     try:
@@ -204,17 +222,19 @@ def show(intent: Intent) -> Result:
 @command("rename")
 def rename(intent: Intent) -> Result:
     """rename <thing> to <new name>"""
-    bad = reject_options(intent, {"to"})
+    bad = reject_options(intent, {"to", "in"})
     if bad:
         return bad
     if not intent.args or "to" not in intent.options:
         return Result.fail("Try: rename old.txt to new.txt")
     if len(intent.args) > 1:
         return quote_hint(intent, intent.args)
+    if intent.containers.get("to"):
+        return Result.fail("rename only changes the name. To put it somewhere else, use: move")
 
-    source = paths.resolve_existing(intent.args[0])
-    if source is None:
-        return not_found(intent.args[0])
+    source = locate_or_fail(intent.args[0], intent.containers.get("", []))
+    if isinstance(source, Result):
+        return source
     if paths.is_protected(source):
         return Result.fail("That's an important folder, so I won't rename it.")
 

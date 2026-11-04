@@ -111,9 +111,9 @@ def test_volume_is_noted_but_not_faked(fake):
 
 
 def test_other_options_are_rejected(fake):
-    result = run_line("open youtube in downloads")
+    result = run_line("open youtube at 5")
     assert not result.ok
-    assert "'in'" in result.message
+    assert "'at'" in result.message
 
 
 def test_open_alone_explains(fake):

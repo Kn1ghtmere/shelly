@@ -2,7 +2,7 @@
 
 # Words that mark the start of an option. Everything after one (up to the
 # next option word) is that option's value:  volume 50   in downloads
-OPTION_KEYWORDS = {"volume", "in", "at", "to", "from", "into", "as", "with", "by"}
+OPTION_KEYWORDS = {"volume", "in", "at", "to", "from", "into", "as", "with", "by", "using"}
 
 # Politeness we silently drop.
 LEADING_POLITE = {"please", "kindly", "can", "could", "would", "you"}
@@ -39,7 +39,10 @@ ALIASES: dict[str, str] = {
     "dir": "list",
     "show files": "list",
     "list files": "list",
-    "list everything": "list",
+    "list all": "listall",
+    "list everything": "listall",
+    "more": "more",
+    "show more": "more",
     "what's in here": "list",
     "whats in here": "list",
     "show me what's in here": "list",
@@ -56,4 +59,11 @@ ALIASES: dict[str, str] = {
     **_make_phrases(("file",), "mkfile"),
     "mkfile": "mkfile",
     "touch": "mkfile",
+    # deleting (to the trash)
+    "delete": "delete",
+    "del": "delete",
+    "rm": "delete",
+    "trash": "delete",
+    "erase": "delete",
+    "throw away": "delete",
 }
