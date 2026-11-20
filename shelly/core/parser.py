@@ -51,6 +51,7 @@ def parse_tokens(
     if not tokens:
         raise ParseError("Tell me what to do, for example: open firefox")
     tokens = _apply_aliases(tokens, aliases)
+    tokens = _normalize_open_browser_order(tokens)
     args, options, containers = _split_options(tokens[1:], option_keywords)
     return Intent(
         verb=tokens[0].text.lower(),
@@ -60,6 +61,17 @@ def parse_tokens(
         line_number=line_number,
         containers=containers,
     )
+
+
+def _normalize_open_browser_order(tokens: list[Token]) -> list[Token]:
+    if (
+        len(tokens) < 5
+        or tokens[0].text.lower() != "open"
+        or tokens[2].quoted
+        or tokens[2].text.lower() != "in"
+    ):
+        return tokens
+    return [*tokens[:2], *tokens[4:], Token("using"), tokens[3]]
 
 
 def parse_chain(

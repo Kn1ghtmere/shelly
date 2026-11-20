@@ -168,10 +168,10 @@ def test_remove_keeps_other_apps(fake, exe, tmp_path):
 
 
 def test_removing_a_browser_with_search_takes_its_actions_too(fake, exe):
-    add(f'add app "{exe}" as brave', "1", "1")
-    assert run_line("remove app brave").ok
-    assert appbook.get_book().find("brave") is None
-    assert "brave" not in appbook.USER_FILE.read_text()
+    add(f'add app "{exe}" as custombrowser', "1", "1")
+    assert run_line("remove app custombrowser").ok
+    assert appbook.get_book().find("custombrowser") is None
+    assert "custombrowser" not in appbook.USER_FILE.read_text()
 
 
 def test_cannot_remove_builtin_apps(fake):

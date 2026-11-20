@@ -74,6 +74,7 @@ inside `if`. Lines starting with `#` are comments.
 
     open youtube
     open youtube search "ben 10"
+    open youtube in brave search songs
     open youtube play rickroll
     open firefox
     open "C:\\Users\\me\\notes.txt"

@@ -34,6 +34,12 @@ def test_search_in_a_chosen_browser(fake):
     assert fake.urls_in == [("msedge", "https://www.youtube.com/results?search_query=ben+10")]
 
 
+def test_search_in_browser_before_action(fake):
+    result = run_line("open youtube in brave search songs")
+    assert result.ok
+    assert fake.urls_in == [("brave", "https://www.youtube.com/results?search_query=songs")]
+
+
 def test_the_browsers_name_depends_on_the_os(fake):
     fake.key = "mac"
     run_line("open youtube using chrome")

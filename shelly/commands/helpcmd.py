@@ -45,7 +45,8 @@ TOPICS: dict[str, list[str]] = {
         "Open apps, websites, files and folders.",
         "  open youtube        open youtube search \"ben 10\"        open youtube play rickroll",
         "  open chrome search \"ben 10\"        open firefox        open notes.txt",
-        "  open youtube in brave        open rythm using chrome        (a browser of your choice)",
+        "  open youtube in brave        open youtube in brave search songs",
+        "  open rythm using chrome        (a browser of your choice)",
         "  apps                (lists everything I know)",
     ],
     "add": [
@@ -73,7 +74,7 @@ TOPICS: dict[str, list[str]] = {
     "in": [
         "'in' says where something is, and you can chain it from the inside out.",
         "  go to tools in assets in D:       means  D:\\assets\\tools",
-        "  open youtube in brave             (when brave is a browser)",
+        "  open youtube in brave             open youtube in brave search songs",
     ],
     "exit": ["Leave Shelly.", "  bye        goodbye        exit        quit        end"],
 }

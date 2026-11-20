@@ -9,6 +9,8 @@ CASES = [
      "open", ["youtube", "play", "outdoor", "boys"], {"volume": "50"}),
     ("OPEN YouTube", "open", ["YouTube"], {}),
     ("open firefox", "open", ["firefox"], {}),
+    ("open youtube in brave search songs", "open",
+     ["youtube", "search", "songs"], {"using": "brave"}),
     ("please open firefox", "open", ["firefox"], {}),
     ("can you please open firefox", "open", ["firefox"], {}),
     ("open firefox please", "open", ["firefox"], {}),

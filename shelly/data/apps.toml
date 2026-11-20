@@ -96,6 +96,17 @@ linux = "microsoft-edge"
 [edge.actions]
 search = "https://www.google.com/search?q={query}"
 
+[brave]
+type = "app"
+role = "browser"
+process = "brave.exe"
+windows = "brave"
+mac = "Brave Browser"
+linux = "brave-browser"
+
+[brave.actions]
+search = "https://search.brave.com/search?q={query}"
+
 [notepad]
 type = "app"
 process = "notepad.exe"
