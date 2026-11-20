@@ -1,6 +1,5 @@
 import subprocess
-from pathlib import Path
-
+from pathlib import Path, PurePosixPath
 import pytest
 
 from shelly.platform import linux, mac, windows
@@ -120,7 +119,7 @@ def test_mac_close_and_trash(monkeypatch):
     system = mac.MacPlatform()
     system.close_app("/Applications/Brave Browser.app")
     assert run.calls[-1][-1] == 'tell application "Brave Browser" to quit'
-    system.trash(Path('/tmp/a "b".txt'))
+    system.trash(PurePosixPath('/tmp/a "b".txt'))
     assert r'POSIX file "/tmp/a \"b\".txt"' in run.calls[-1][-1]
 
 

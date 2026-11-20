@@ -7,6 +7,48 @@ A beginner-friendly shell you talk to in plain English.
 
 Needs Python 3.11+.
 
+## Install on another device
+
+### Linux (Fedora, Ubuntu, Debian)
+
+Open your terminal app. On Fedora, install Git and pipx with:
+
+    sudo dnf install git pipx
+
+On Ubuntu or Debian, use:
+
+    sudo apt update
+    sudo apt install git pipx
+
+If your distribution does not have a `pipx` package, follow the
+[pipx installation instructions](https://pipx.pypa.io/stable/installation/).
+Then run:
+
+    pipx ensurepath
+
+Close and reopen the terminal so it picks up the PATH update, then install and
+start Shelly:
+
+    pipx install "git+https://github.com/Kn1ghtmere/shelly.git"
+    shelly
+
+Hyprland is a desktop environment/window manager, not a Linux distribution, so
+there are no Hyprland-specific install steps. Use the commands for the
+distribution Hyprland is running on (for example, Fedora). These commands work
+in common terminal shells such as Bash and Zsh.
+
+### Other platforms
+
+Install [pipx](https://pipx.pypa.io/) and Git, then run:
+
+    pipx install "git+https://github.com/Kn1ghtmere/shelly.git"
+    shelly
+
+This installs Shelly in an isolated Python environment and adds the `shelly`
+command to your PATH. After new changes are pushed, update with
+`pipx upgrade shelly`. Your personal `.shelly/apps.toml` configuration is
+separate and must be copied to the other device if you want to reuse it.
+
 ## How a line is read
 
     open youtube play "outdoor boys" volume 50
