@@ -64,6 +64,20 @@ def test_detect_apps_avoids_existing_app_names(fake, tmp_path):
     assert appbook.get_book().find("chrome-2").launch_name("windows") == str(executable)
 
 
+def test_detect_apps_saves_path_for_current_platform(fake, tmp_path):
+    fake.key = "linux"
+    executable = tmp_path / "cool-app"
+    fake.detected_apps = [InstalledApp("Cool App", executable)]
+
+    result = run_line("detect apps")
+
+    assert result.ok
+    saved = appbook.get_book().find("cool-app")
+    assert saved is not None
+    assert saved.launch_name("linux") == str(executable)
+    assert saved.launch_name("windows") == "cool-app"
+
+
 def test_add_app_asks_for_a_type_first(fake, exe):
     result = run_line(f'add app "{exe}" as cool')
     assert result.ask is not None

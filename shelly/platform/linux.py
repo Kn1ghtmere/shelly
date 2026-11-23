@@ -1,11 +1,12 @@
 import os
+import shlex
 import shutil
 import subprocess
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
 
-from .base import Platform, PlatformError
+from .base import InstalledApp, Platform, PlatformError
 
 _QUIET = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL, "start_new_session": True}
 _MEDIA = {"play": "play", "pause": "pause", "stop": "pause", "next": "next", "previous": "previous"}
@@ -13,6 +14,22 @@ _MEDIA = {"play": "play", "pause": "pause", "stop": "pause", "next": "next", "pr
 
 class LinuxPlatform(Platform):
     key = "linux"
+
+    def detect_apps(self) -> list[InstalledApp]:
+        apps: dict[str, InstalledApp] = {}
+        for directory in _application_dirs():
+            if not directory.is_dir():
+                continue
+            for entry in directory.rglob("*.desktop"):
+                name, executable = _desktop_app(entry)
+                if not name or not executable:
+                    continue
+                found = shutil.which(executable)
+                if found:
+                    path = Path(found)
+                    key = os.path.normcase(os.path.normpath(str(path)))
+                    apps.setdefault(key, InstalledApp(name, path))
+        return sorted(apps.values(), key=lambda app: (app.name.casefold(), str(app.path).casefold()))
 
     def open_app(self, name: str) -> None:
         found = shutil.which(name)
@@ -77,6 +94,62 @@ class LinuxPlatform(Platform):
             subprocess.run([amixer, "sset", "Master", f"{percent}%"], capture_output=True)
             return "system volume"
         raise PlatformError("I couldn't find a way to set the volume here (tried playerctl, pactl, amixer).")
+
+
+def _application_dirs() -> list[Path]:
+    data_home = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share")
+    data_dirs = os.environ.get("XDG_DATA_DIRS") or "/usr/local/share:/usr/share"
+    directories = [data_home / "applications"]
+    directories.extend(Path(root) / "applications" for root in data_dirs.split(os.pathsep) if root)
+    directories.extend([
+        Path("/var/lib/flatpak/exports/share/applications"),
+        Path("/var/lib/snapd/desktop/applications"),
+    ])
+    return directories
+
+
+def _desktop_app(entry: Path) -> tuple[str | None, str | None]:
+    try:
+        lines = entry.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeError) as error:
+        raise PlatformError(f"I couldn't read the app menu entry {entry}: {error}") from error
+
+    values: dict[str, str] = {}
+    in_desktop_entry = False
+    for line in lines:
+        line = line.strip()
+        if line.startswith("["):
+            in_desktop_entry = line == "[Desktop Entry]"
+        elif in_desktop_entry and line and not line.startswith("#"):
+            key, separator, value = line.partition("=")
+            if separator:
+                values[key] = value
+
+    if (
+        values.get("Type", "Application") != "Application"
+        or values.get("Hidden", "").lower() == "true"
+        or values.get("NoDisplay", "").lower() == "true"
+    ):
+        return None, None
+
+    command = values.get("Exec", "")
+    try:
+        tokens = shlex.split(command)
+    except ValueError as error:
+        raise PlatformError(f"I couldn't parse the launch command in {entry}: {error}") from error
+    if not tokens:
+        return None, None
+
+    if Path(tokens[0]).name == "env":
+        tokens = tokens[1:]
+        while tokens and ("=" in tokens[0] or tokens[0].startswith("-")):
+            if tokens[0] == "-u" and len(tokens) > 1:
+                tokens = tokens[2:]
+            else:
+                tokens = tokens[1:]
+    if not tokens or Path(tokens[0]).name in {"sh", "bash", "dash", "zsh"}:
+        return None, None
+    return values.get("Name") or entry.stem, tokens[0]
 
 
 def _freedesktop_trash(path: Path) -> None:

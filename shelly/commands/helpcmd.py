@@ -55,8 +55,10 @@ TOPICS: dict[str, list[str]] = {
         "  add website https://rythm.fm as rythm        remove app spotify",
     ],
     "detect": [
-        "Find installed Windows apps and save their names and executable paths.",
+        "Find installed apps and save their names and executable paths.",
         "  detect apps        (safe to run again; already-known apps are skipped)",
+        "  Windows: installed-program registry and Start Menu shortcuts",
+        "  Linux: desktop app launchers",
         "  apps               (show the apps and detected paths Shelly knows)",
     ],
     "close": ["Close a program politely (it asks about unsaved work).", "  close notepad        close notepad and calculator"],

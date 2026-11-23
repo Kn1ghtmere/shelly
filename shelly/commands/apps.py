@@ -1,4 +1,5 @@
 import ntpath
+import os
 import re
 import shutil
 from pathlib import Path
@@ -201,20 +202,22 @@ def detect_apps(intent: Intent) -> Result:
     if intent.args not in ([], ["apps"], ["apps", "once"]):
         return Result.fail("Try: detect apps")
     try:
-        detected = plat.current().detect_apps()
+        system = plat.current()
+        detected = system.detect_apps()
         book = appbook.get_book()
     except (plat.PlatformError, appbook.AppConfigError) as error:
         return Result.fail(str(error))
 
     known_paths = {
-        ntpath.normcase(ntpath.normpath(app.launch_name("windows")))
+        os.path.normcase(os.path.normpath(app.launch_name(system.key)))
         for app in book.all()
-        if ntpath.isabs(app.launch_name("windows"))
+        if os.path.isabs(app.launch_name(system.key))
+        or (system.key == "windows" and ntpath.isabs(app.launch_name(system.key)))
     }
     sections: dict[str, dict[str, str]] = {}
     added: list[tuple[str, Path]] = []
     for app in detected:
-        path_key = ntpath.normcase(ntpath.normpath(str(app.path)))
+        path_key = os.path.normcase(os.path.normpath(str(app.path)))
         if path_key in known_paths:
             continue
         base = re.sub(r"[^a-z0-9]+", "-", app.name.casefold()).strip("-") or "app"
@@ -222,7 +225,7 @@ def detect_apps(intent: Intent) -> Result:
         while book.find(name) or name in sections:
             name = f"{base}-{suffix}"
             suffix += 1
-        sections[name] = {"type": "app", "windows": str(app.path)}
+        sections[name] = {"type": "app", system.key: str(app.path)}
         known_paths.add(path_key)
         added.append((name, app.path))
 

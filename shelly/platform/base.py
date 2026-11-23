@@ -34,7 +34,7 @@ class Platform:
         raise NotImplementedError
 
     def detect_apps(self) -> list[InstalledApp]:
-        raise PlatformError("App detection is currently available on Windows only.")
+        raise PlatformError("App detection isn't supported on this platform yet.")
 
     def close_app(self, name: str, process: str | None = None) -> None:
         """Politely ask a program to close (it may still ask about unsaved work)."""

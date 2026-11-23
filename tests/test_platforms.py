@@ -242,3 +242,30 @@ def test_linux_trash_prefers_gio(monkeypatch, tmp_path):
     linux.LinuxPlatform().trash(f)
     assert run.calls == [["/usr/bin/gio", "trash", str(f)]]
     assert f.exists()  # gio (not us) does the moving
+
+
+def test_linux_detects_desktop_launcher_executables(monkeypatch, tmp_path):
+    applications = tmp_path / "applications"
+    applications.mkdir()
+    (applications / "cool.desktop").write_text(
+        "[Desktop Entry]\n"
+        "Type=Application\n"
+        "Name=Cool App\n"
+        "Exec=env APP_MODE=1 cool-app --open %U\n"
+    )
+    (applications / "duplicate.desktop").write_text(
+        "[Desktop Entry]\nType=Application\nName=Another Name\nExec=cool-app %U\n"
+    )
+    (applications / "hidden.desktop").write_text(
+        "[Desktop Entry]\nType=Application\nName=Hidden\nExec=hidden-app\nNoDisplay=true\n"
+    )
+    monkeypatch.setattr(linux, "_application_dirs", lambda: [applications])
+    monkeypatch.setattr(
+        linux.shutil, "which", lambda name: "/usr/bin/cool-app" if name == "cool-app" else None
+    )
+
+    detected = linux.LinuxPlatform().detect_apps()
+
+    assert len(detected) == 1
+    assert detected[0].path == Path("/usr/bin/cool-app")
+    assert detected[0].name in {"Cool App", "Another Name"}
