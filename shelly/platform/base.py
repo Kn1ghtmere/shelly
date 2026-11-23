@@ -1,9 +1,16 @@
 import webbrowser
+from dataclasses import dataclass
 from pathlib import Path
 
 
 class PlatformError(Exception):
     """Something the operating system couldn't do. The message is for humans."""
+
+
+@dataclass(frozen=True)
+class InstalledApp:
+    name: str
+    path: Path
 
 
 class Platform:
@@ -25,6 +32,9 @@ class Platform:
 
     def open_app(self, name: str) -> None:
         raise NotImplementedError
+
+    def detect_apps(self) -> list[InstalledApp]:
+        raise PlatformError("App detection is currently available on Windows only.")
 
     def close_app(self, name: str, process: str | None = None) -> None:
         """Politely ask a program to close (it may still ask about unsaved work)."""

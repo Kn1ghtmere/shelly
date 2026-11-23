@@ -2,7 +2,7 @@ import pytest
 
 from shelly.core import appbook
 from shelly.core.engine import answer, run_line
-from shelly.platform.base import PlatformError
+from shelly.platform.base import InstalledApp, PlatformError
 from shelly.platform.linux import LinuxPlatform
 
 
@@ -23,6 +23,45 @@ def add(line, *replies):
 
 
 # --- apps ------------------------------------------------------------------------
+
+def test_detect_apps_saves_names_and_paths(fake, tmp_path):
+    executable = tmp_path / "Cool App.exe"
+    executable.write_text("x")
+    fake.detected_apps = [InstalledApp("Cool App", executable)]
+
+    result = run_line("detect apps")
+
+    assert result.ok
+    assert "cool-app" in result.message
+    assert str(executable) in result.message
+    saved = appbook.get_book().find("cool-app")
+    assert saved is not None
+    assert saved.launch_name("windows") == str(executable)
+    assert str(executable) in run_line("apps").message
+
+
+def test_detect_apps_skips_paths_on_repeat(fake, tmp_path):
+    executable = tmp_path / "Cool App.exe"
+    executable.write_text("x")
+    fake.detected_apps = [InstalledApp("Cool App", executable)]
+
+    assert run_line("detect apps").ok
+    result = run_line("detect apps")
+
+    assert result.ok
+    assert "up to date" in result.message
+    assert appbook.USER_FILE.read_text().count("[cool-app]") == 1
+
+
+def test_detect_apps_avoids_existing_app_names(fake, tmp_path):
+    executable = tmp_path / "Chrome Beta.exe"
+    executable.write_text("x")
+    fake.detected_apps = [InstalledApp("Chrome", executable)]
+
+    result = run_line("detect apps")
+
+    assert result.ok
+    assert appbook.get_book().find("chrome-2").launch_name("windows") == str(executable)
 
 
 def test_add_app_asks_for_a_type_first(fake, exe):

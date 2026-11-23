@@ -1,3 +1,4 @@
+import json
 import subprocess
 from pathlib import Path, PurePosixPath
 import pytest
@@ -81,6 +82,29 @@ def test_windows_trash_failure(monkeypatch, tmp_path):
 def test_image_names():
     assert windows._image_name("notepad") == "notepad.exe"
     assert windows._image_name(r"C:\x\Brave.exe") == "Brave.exe"
+
+
+def test_windows_display_icon_path_removes_icon_index():
+    assert str(windows._display_icon_path(r'"C:\Apps\Cool App.exe",0')) == r"C:\Apps\Cool App.exe"
+    assert str(windows._display_icon_path(r"C:\Apps\Cool.exe,-1")) == r"C:\Apps\Cool.exe"
+    assert windows._display_icon_path("C:\\Apps\\readme.txt") is None
+
+
+def test_windows_detects_start_menu_shortcut_targets(monkeypatch, tmp_path):
+    executable = tmp_path / "Cool App.exe"
+    executable.write_text("x")
+    output = json.dumps([{"name": "Cool App", "path": str(executable)}])
+    monkeypatch.setattr(
+        windows.subprocess,
+        "run",
+        lambda command, **kwargs: subprocess.CompletedProcess(command, 0, output, ""),
+    )
+    system = windows.WindowsPlatform()
+    monkeypatch.setattr(system, "_detect_registry_apps", lambda apps: None)
+
+    detected = system.detect_apps()
+
+    assert [(app.name, app.path) for app in detected] == [("Cool App", executable)]
 
 
 # --- macOS --------------------------------------------------------------------------------------------

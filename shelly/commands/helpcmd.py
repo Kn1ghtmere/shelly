@@ -54,6 +54,11 @@ TOPICS: dict[str, list[str]] = {
         "  add app \"C:\\Program Files\\Spotify\\spotify.exe\" as spotify",
         "  add website https://rythm.fm as rythm        remove app spotify",
     ],
+    "detect": [
+        "Find installed Windows apps and save their names and executable paths.",
+        "  detect apps        (safe to run again; already-known apps are skipped)",
+        "  apps               (show the apps and detected paths Shelly knows)",
+    ],
     "close": ["Close a program politely (it asks about unsaved work).", "  close notepad        close notepad and calculator"],
     "music": [
         "Control whatever music is playing.",
@@ -97,7 +102,8 @@ OVERVIEW = """Here's what I can do. Type  help <topic>  for examples.
   make      folders and files      copy      copy, cut, paste, move
   rename    change a name          delete    to the trash, after asking
   show      open the file explorer open      apps, websites, files
-  add       teach me an app        close     close a program
+  add       teach me an app        detect    find installed apps
+  close     close a program
   music     play, pause, volume    and       several commands in one line
   quotes    when to use "quotes"   in        'tools in assets in D:'
 

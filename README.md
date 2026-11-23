@@ -78,11 +78,16 @@ inside `if`. Lines starting with `#` are comments.
     open youtube play rickroll
     open firefox
     open "C:\\Users\\me\\notes.txt"
+    detect apps             # find installed Windows apps and save their paths
     apps                    # list everything Shelly knows
 
 The app list is `shelly/data/apps.toml`. To add your own, create
 `.shelly/apps.toml` in your home folder with the same format; your entries
 win over the built-in ones.
+On Windows, `detect apps` finds executable paths from installed-program
+registry entries and Start Menu shortcuts, then saves them to that file.
+Detected apps appear in `apps`; running detection again skips paths already
+in the list.
 
 Everything OS-specific lives in `shelly/platform/` (windows, mac, linux).
 Commands never check which system they're on.

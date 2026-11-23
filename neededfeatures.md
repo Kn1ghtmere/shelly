@@ -12,9 +12,7 @@ or
 app config brave 
 or synonymous commands
 
-there should be an app detecting feature , that i can run just once
-and i detects all the apps on my pc 
-with there names and paths
+
 
 i think find/search commands should be addded to the file explorer 
 open brave and chrome 

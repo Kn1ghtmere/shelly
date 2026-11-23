@@ -1,11 +1,13 @@
+import json
 import ntpath
 import os
+import re
 import shutil
 import subprocess
 import time
 from pathlib import Path
 
-from .base import Platform, PlatformError
+from .base import InstalledApp, Platform, PlatformError
 
 _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
@@ -17,6 +19,101 @@ _VK_VOLUME_UP = 0xAF
 
 class WindowsPlatform(Platform):
     key = "windows"
+
+    def detect_apps(self) -> list[InstalledApp]:
+        apps: dict[str, InstalledApp] = {}
+        self._detect_registry_apps(apps)
+        self._detect_shortcut_apps(apps)
+        return sorted(apps.values(), key=lambda app: (app.name.casefold(), str(app.path).casefold()))
+
+    @staticmethod
+    def _detect_registry_apps(apps: dict[str, InstalledApp]) -> None:
+        try:
+            import winreg
+        except ImportError as error:
+            raise PlatformError("I couldn't read the Windows installed-app registry.") from error
+
+        uninstall_key = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
+        keys = (
+            (winreg.HKEY_CURRENT_USER, uninstall_key),
+            (winreg.HKEY_LOCAL_MACHINE, uninstall_key),
+            (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"),
+        )
+        for hive, key_path in keys:
+            try:
+                root = winreg.OpenKey(hive, key_path)
+            except OSError:
+                continue
+            with root:
+                index = 0
+                while True:
+                    try:
+                        subkey_name = winreg.EnumKey(root, index)
+                    except OSError:
+                        break
+                    index += 1
+                    try:
+                        with winreg.OpenKey(root, subkey_name) as subkey:
+                            name, _ = winreg.QueryValueEx(subkey, "DisplayName")
+                            icon, _ = winreg.QueryValueEx(subkey, "DisplayIcon")
+                            try:
+                                component, _ = winreg.QueryValueEx(subkey, "SystemComponent")
+                            except OSError:
+                                component = 0
+                    except OSError:
+                        continue
+                    path = _display_icon_path(str(icon))
+                    if name and not component and path is not None and path.is_file():
+                        _add_detected_app(apps, str(name), path)
+
+    @staticmethod
+    def _detect_shortcut_apps(apps: dict[str, InstalledApp]) -> None:
+        script = r"""
+$ErrorActionPreference = 'Stop'
+$shell = New-Object -ComObject WScript.Shell
+$roots = @(
+    (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'),
+    (Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs')
+)
+$apps = @()
+foreach ($root in $roots) {
+    if (Test-Path -LiteralPath $root) {
+        Get-ChildItem -LiteralPath $root -Filter '*.lnk' -Recurse -File -ErrorAction SilentlyContinue |
+            ForEach-Object {
+                $shortcut = $shell.CreateShortcut($_.FullName)
+                $target = $shortcut.TargetPath
+                if ($target -and [IO.Path]::GetExtension($target) -ieq '.exe' -and
+                    (Test-Path -LiteralPath $target -PathType Leaf)) {
+                    $apps += [pscustomobject]@{ name = $_.BaseName; path = $target }
+                }
+            }
+    }
+}
+ConvertTo-Json -InputObject @($apps) -Compress
+"""
+        try:
+            done = subprocess.run(
+                ["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+                capture_output=True, text=True, creationflags=_NO_WINDOW,
+            )
+        except OSError as error:
+            raise PlatformError(f"I couldn't scan the Start menu for apps: {error}") from error
+        if done.returncode != 0:
+            raise PlatformError("I couldn't scan the Start menu for installed apps.")
+        try:
+            rows = json.loads(done.stdout or "[]")
+        except json.JSONDecodeError as error:
+            raise PlatformError("Windows returned an unreadable app list.") from error
+        if isinstance(rows, dict):
+            rows = [rows]
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            name, raw_path = row.get("name"), row.get("path")
+            if name and raw_path:
+                path = Path(str(raw_path))
+                if path.is_file():
+                    _add_detected_app(apps, str(name), path)
 
     def open_app(self, name: str) -> None:
         try:
@@ -94,6 +191,24 @@ class WindowsPlatform(Platform):
 def _image_name(name: str) -> str:
     base = ntpath.basename(name)
     return base if base.lower().endswith(".exe") else base + ".exe"
+
+
+def _display_icon_path(value: str) -> Path | None:
+    value = os.path.expandvars(value.strip())
+    quoted = re.match(r'^"([^"]+)"(?:,\s*-?\d+)?$', value)
+    if quoted:
+        value = quoted.group(1)
+    else:
+        executable = re.match(r"^(.+?\.exe)(?:,\s*-?\d+)?$", value, re.IGNORECASE)
+        if executable:
+            value = executable.group(1)
+    path = Path(value)
+    return path if path.suffix.lower() == ".exe" else None
+
+
+def _add_detected_app(apps: dict[str, InstalledApp], name: str, path: Path) -> None:
+    key = ntpath.normcase(ntpath.normpath(str(path)))
+    apps.setdefault(key, InstalledApp(name.strip(), path))
 
 
 def _find_exe(name: str) -> str | None:

@@ -1,3 +1,5 @@
+import ntpath
+import re
 import shutil
 from pathlib import Path
 from urllib.parse import urlparse
@@ -182,8 +184,56 @@ def list_apps(intent: Intent) -> Result:
     lines = [f"Apps I know (your own are saved in {appbook.USER_FILE}):"]
     for app in book.all():
         label = app.name + (f" ({', '.join(app.aliases)})" if app.aliases else "")
+        launch = app.launch_name(plat.current().key)
+        if ntpath.isabs(launch) or Path(launch).is_absolute():
+            label += f" — {launch}"
         extra = f"  - {', '.join(sorted(app.actions))}" if app.actions else ""
         lines.append(f"  {label}{extra}")
+    return Result.success("\n".join(lines))
+
+
+@command("detect", "scan")
+def detect_apps(intent: Intent) -> Result:
+    """detect apps [once]"""
+    bad = reject_options(intent, set())
+    if bad:
+        return bad
+    if intent.args not in ([], ["apps"], ["apps", "once"]):
+        return Result.fail("Try: detect apps")
+    try:
+        detected = plat.current().detect_apps()
+        book = appbook.get_book()
+    except (plat.PlatformError, appbook.AppConfigError) as error:
+        return Result.fail(str(error))
+
+    known_paths = {
+        ntpath.normcase(ntpath.normpath(app.launch_name("windows")))
+        for app in book.all()
+        if ntpath.isabs(app.launch_name("windows"))
+    }
+    sections: dict[str, dict[str, str]] = {}
+    added: list[tuple[str, Path]] = []
+    for app in detected:
+        path_key = ntpath.normcase(ntpath.normpath(str(app.path)))
+        if path_key in known_paths:
+            continue
+        base = re.sub(r"[^a-z0-9]+", "-", app.name.casefold()).strip("-") or "app"
+        name, suffix = base, 2
+        while book.find(name) or name in sections:
+            name = f"{base}-{suffix}"
+            suffix += 1
+        sections[name] = {"type": "app", "windows": str(app.path)}
+        known_paths.add(path_key)
+        added.append((name, app.path))
+
+    try:
+        appbook.append_user_sections(sections)
+    except OSError as error:
+        return Result.fail(f"I couldn't save the detected apps: {error}")
+    if not added:
+        return Result.success("I didn't find any new apps to add. Your app list is up to date.")
+    lines = [f"Added {len(added)} app(s) to {appbook.USER_FILE}:"]
+    lines.extend(f"  {name} — {path}" for name, path in added)
     return Result.success("\n".join(lines))
 
 

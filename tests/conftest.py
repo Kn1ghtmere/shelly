@@ -5,6 +5,7 @@ import pytest
 from shelly import commands  # noqa: F401  (registers commands)
 from shelly import platform as plat
 from shelly.core import appbook, session
+from shelly.platform.base import InstalledApp
 
 
 class FakePlatform(plat.Platform):
@@ -17,6 +18,7 @@ class FakePlatform(plat.Platform):
         self.urls_in, self.revealed = [], []
         self.closed, self.media_actions, self.volumes = [], [], []
         self.trashed = []
+        self.detected_apps = []
         self.error = None
 
     def _maybe_fail(self):
@@ -34,6 +36,10 @@ class FakePlatform(plat.Platform):
     def open_app(self, name):
         self._maybe_fail()
         self.apps.append(name)
+
+    def detect_apps(self):
+        self._maybe_fail()
+        return self.detected_apps
 
     def close_app(self, name, process=None):
         self._maybe_fail()

@@ -168,6 +168,27 @@ def append_user_section(
     set_book(None)
 
 
+def append_user_sections(sections: dict[str, dict[str, str]], file: Path | None = None) -> None:
+    """Append several app sections to the user's apps.toml in one write."""
+    if not sections:
+        return
+    file = file or USER_FILE
+    file.parent.mkdir(parents=True, exist_ok=True)
+    existing = file.read_text(encoding="utf-8") if file.exists() else ""
+    blocks = []
+    for name, fields in sections.items():
+        key = _toml_key(name)
+        blocks.append(
+            f"[{key}]\n" + "".join(f"{key} = {_toml_string(value)}\n" for key, value in fields.items())
+        )
+    if existing and not existing.endswith("\n"):
+        existing += "\n"
+    if existing and not existing.endswith("\n\n"):
+        existing += "\n"
+    file.write_text(existing + "\n".join(blocks), encoding="utf-8")
+    set_book(None)
+
+
 _HEADER = re.compile(r"^\s*\[\s*([^\[\]]+?)\s*\]\s*(#.*)?$")
 
 
